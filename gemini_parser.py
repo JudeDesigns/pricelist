@@ -397,6 +397,89 @@ Product ID,Product Description,Cost
 Return ONLY the CSV data with header.
 """
 
+    elif vendor == 'la_poultry':
+        return """
+Please extract ALL product information from this PDF price list.
+
+This is a Los Angeles Poultry (LA Poultry) price list.
+
+CRITICAL INSTRUCTIONS FOR LA POULTRY:
+- This vendor does NOT have Product IDs
+- Use "N/A" for ALL Product IDs (first column)
+- Extract EVERY product from EVERY page
+- Keep the COMPLETE product description in the second column
+- Extract the price/cost in the third column
+
+CSV FORMAT RULES - VERY IMPORTANT:
+- Use EXACTLY 3 columns: Product ID, Product Description, Cost
+- First column is ALWAYS "N/A" (no quotes needed)
+- Second column contains the FULL product description - MUST be wrapped in double quotes "..." if it contains commas
+- Third column contains ONLY the price (e.g., $2.99, 1.85, $3.49/LB)
+- Do NOT split the description across multiple columns
+- Do NOT put part of the description in the Product ID column
+- ALWAYS wrap descriptions in quotes to handle commas properly
+
+Return the data in CSV format with this EXACT header:
+Product ID,Product Description,Cost
+
+Example rows (note the quotes around descriptions):
+N/A,"CHICKEN BREAST BONELESS SKINLESS 40# CS",$2.99
+N/A,"CHICKEN THIGHS FRESH",$1.85
+N/A,"CHICKEN WINGS JUMBO 40# CS",$3.49
+N/A,"TURKEY BREAST WHOLE",$4.25
+N/A,"Tilapia Fillet, shallow skin, Fortune's Wind 2/3BULK",$1.80
+N/A,"Swai fillet, Belly off, Vietnam, 100%, Lucky spot Brand, 7/9 1x15lbs IQF",$2.15
+
+REMEMBER:
+- ALL Product IDs should be "N/A" for this vendor!
+- ALWAYS wrap the description in double quotes
+- Put the ENTIRE description in the second column
+- Put ONLY the price in the third column
+
+Do NOT include:
+- Category headers
+- Rows without a price
+- Any explanatory text
+
+Return ONLY the CSV data with header.
+"""
+
+    elif vendor == 'tnt_produce':
+        return """
+Please extract ALL product information from this PDF price list.
+
+This is a TNT Produce Company price list.
+
+CRITICAL INSTRUCTIONS FOR TNT PRODUCE:
+- This vendor does NOT have Product IDs
+- Use "N/A" for ALL Product IDs
+- Extract ONLY the product description and price
+- Extract EVERY product from EVERY page
+- Keep the full product description
+- Extract prices (look for decimal numbers like 3.49, 12.99, etc.)
+- Include unit information if present (/LB, /CS, /EA, /BOX, etc.)
+- If a product has MULTIPLE PRICES for different variations (sizes, grades, etc.), create SEPARATE rows for each variation
+- For variations, append the variation details to the description
+
+Return the data in CSV format with this EXACT header:
+Product ID,Product Description,Cost
+
+Example rows:
+N/A,TOMATOES ROMA,$1.25/LB
+N/A,LETTUCE ICEBERG,$0.89/EA
+N/A,ONIONS YELLOW,$0.65/LB
+N/A,POTATOES RUSSET 50LB,$18.99/BOX
+
+REMEMBER: ALL Product IDs should be "N/A" for this vendor!
+
+Do NOT include:
+- Category headers
+- Rows without a price
+- Any explanatory text
+
+Return ONLY the CSV data with header.
+"""
+
     elif vendor == 'royalty_distribution':
         return """
 Please extract ALL product information from this PDF price list.
@@ -419,32 +502,6 @@ Example rows:
 RD-001,BEEF RIBEYE STEAK,$9.99/LB
 N/A,PORK CHOPS BONELESS,$5.49/LB
 789,CHICKEN THIGHS,$3.99/LB
-
-Return ONLY the CSV data with header.
-"""
-
-    elif vendor == 'la_poultry':
-        return """
-Please extract ALL product information from this PDF price list.
-
-This is a Los Angeles Poultry Co price list.
-
-IMPORTANT INSTRUCTIONS:
-- Extract EVERY product from EVERY page
-- Product IDs can be alphanumeric (letters, numbers, hyphens)
-- If a product does NOT have a Product ID, use "N/A" in the Product ID column
-- Keep the full product description
-- Extract prices (look for decimal numbers like 3.49, 12.99, etc.)
-- If a product has MULTIPLE PRICES for different variations (sizes, grades, etc.), create SEPARATE rows for each variation
-- For variations, append the variation details to the description
-
-Return the data in CSV format with this EXACT header:
-Product ID,Product Description,Cost
-
-Example rows:
-LAP-001,CHICKEN BREAST BONELESS,$2.99/LB
-N/A,CHICKEN WINGS FRESH,$3.49/LB
-123,CHICKEN DRUMSTICKS,$1.99/LB
 
 Return ONLY the CSV data with header.
 """

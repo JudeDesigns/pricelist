@@ -12,8 +12,31 @@ import time
 from datetime import datetime
 from openpyxl import load_workbook
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+# Configure tesseract path for Linux systems
+try:
+    import pytesseract
+    # Try to find tesseract in common Linux locations
+    tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract', '/bin/tesseract']
+    for path in tesseract_paths:
+        if os.path.exists(path):
+            pytesseract.pytesseract.tesseract_cmd = path
+            break
+except ImportError:
+    pass  # pytesseract not installed, will be handled by pdf_processor
+
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'
+# Use secret key from environment or fallback to default
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this-in-production')
+
+# Debug: Print if Gemini API key is loaded
+if os.environ.get('GEMINI_API_KEY'):
+    print(f"✅ GEMINI_API_KEY loaded: {os.environ.get('GEMINI_API_KEY')[:20]}...")
+else:
+    print("⚠️  GEMINI_API_KEY not found in environment")
 
 # Use absolute path for upload folder to avoid path issues
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -77,6 +100,15 @@ VENDOR_NAME_MAPPING = {
     'la poultry': 'la_poultry',
     'lapoultry': 'la_poultry',
     'la_poultry': 'la_poultry',
+    'price_list_la': 'la_poultry',  # Price_List_LA filename pattern
+
+    # TNT Produce Company patterns
+    'tnt_produce_company': 'tnt_produce',
+    'tnt produce company': 'tnt_produce',
+    'tnt_produce': 'tnt_produce',
+    'tnt produce': 'tnt_produce',
+    'tntproduce': 'tnt_produce',
+    'tnt': 'tnt_produce',
 
     # APSIC Wholesale patterns
     'apsic_wholesale': 'apsic_wholesale',

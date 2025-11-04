@@ -14,6 +14,7 @@ from .maui_prices import MauiPricesParser
 from .cd_international import CDInternationalParser
 from .royalty_distribution import RoyaltyDistributionParser
 from .la_poultry import LAPoultryParser
+from .tnt_produce import TNTProduceParser
 from .apsic_wholesale import APSICWholesaleParser
 from .delmar_cow import DelMarCowParser
 from .delmar_steer import DelMarSteerParser
@@ -38,6 +39,7 @@ VENDOR_PARSERS = {
     'cd_international': CDInternationalParser,
     'royalty_distribution': RoyaltyDistributionParser,
     'la_poultry': LAPoultryParser,
+    'tnt_produce': TNTProduceParser,
     'apsic_wholesale': APSICWholesaleParser,
     'delmar_cow': DelMarCowParser,
     'delmar_steer': DelMarSteerParser,

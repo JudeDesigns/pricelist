@@ -5,6 +5,14 @@ from PIL import Image
 import re
 import cv2
 import numpy as np
+import os
+
+# Configure tesseract path for Linux systems
+tesseract_paths = ['/usr/bin/tesseract', '/usr/local/bin/tesseract', '/bin/tesseract']
+for path in tesseract_paths:
+    if os.path.exists(path):
+        pytesseract.pytesseract.tesseract_cmd = path
+        break
 
 # Try to import PyMuPDF (fitz) for faster image extraction
 try:
@@ -98,6 +106,13 @@ VENDOR_CONFIGS = {
         'max_product_id_length': 15,
         'requires_dollar_sign': False,
         'description': 'Los Angeles Poultry Co - flexible alphanumeric product IDs'
+    },
+    'tnt_produce': {
+        'name': 'TNT Produce Company',
+        'product_id_format': 'flexible',
+        'max_product_id_length': 15,
+        'requires_dollar_sign': False,
+        'description': 'TNT Produce Company - flexible alphanumeric product IDs'
     },
     'apsic_wholesale': {
         'name': 'APSIC Wholesale',
@@ -335,7 +350,7 @@ def process_pdf(filepath, vendor='rw_zant'):
 
     # Use Gemini AI for these vendors (if available)
     gemini_vendors = ['glen_rose', 'kruse_sons', 'quirch_foods', 'purcell', 'laras_meat', 'maui_prices',
-                      'cd_international', 'royalty_distribution', 'la_poultry',
+                      'cd_international', 'royalty_distribution', 'la_poultry', 'tnt_produce',
                       'apsic_wholesale', 'delmar_cow', 'delmar_steer',
                       'gladway', 'union_fish', 'solomon_wholesale', 'da_price', 'broadleaf',
                       'cofoods', 'monarch_trading', 'unknown']
@@ -385,7 +400,7 @@ def process_pdf(filepath, vendor='rw_zant'):
             raise Exception(f"Failed to extract data from Quirch Foods PDF: {str(e)}")
 
     # Gemini-supported vendors fallback: Use image-based table extraction (OCR + regex)
-    if vendor in ['purcell', 'laras_meat', 'maui_prices', 'cd_international', 'royalty_distribution', 'la_poultry',
+    if vendor in ['purcell', 'laras_meat', 'maui_prices', 'cd_international', 'royalty_distribution', 'la_poultry', 'tnt_produce',
                   'apsic_wholesale', 'delmar_cow', 'delmar_steer',
                   'gladway', 'union_fish', 'solomon_wholesale', 'da_price', 'broadleaf',
                   'cofoods', 'monarch_trading']:
