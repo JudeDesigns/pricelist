@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Upload PDFs - PDF Price List Extractor{% endblock %}
+
+{% block content %}
+<div class="upload-section">
+    <div class="upload-card">
+        <h2>Upload Vendor Price Lists</h2>
+        <p class="subtitle">Upload up to 30 PDF files containing price lists. The system will extract Product ID, Description, and Cost from each file.</p>
+        
+        <form action="{{ url_for('upload_files') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
+            <div class="file-upload-wrapper">
+                <input type="file" name="files[]" id="fileInput" multiple accept=".pdf" required>
+                <label for="fileInput" class="file-upload-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Click to select PDF files or drag and drop</span>
+                    <span class="file-limit">Maximum 30 files</span>
+                </label>
+            </div>
+            
+            <div id="fileList" class="file-list"></div>
+            
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                Process Files
+            </button>
+        </form>
+    </div>
+
+    <div class="info-card">
+        <h3>How it works</h3>
+        <ol>
+            <li><strong>Upload:</strong> Select up to 30 PDF files containing vendor price lists</li>
+            <li><strong>Process:</strong> The system extracts data from both text-based and image-based tables</li>
+            <li><strong>Review:</strong> View extracted data organized by vendor name</li>
+        </ol>
+        
+        <h3>File Naming</h3>
+        <p>Name your files with the vendor name followed by date/numbers:</p>
+        <ul>
+            <li>✓ <code>AcmeSupplies_20250106.pdf</code></li>
+            <li>✓ <code>GlobalVendor_2025.pdf</code></li>
+            <li>✓ <code>TechCorp123.pdf</code></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadForm = document.getElementById('uploadForm');
+
+    fileInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        displayFileList(files);
+    });
+
+    function displayFileList(files) {
+        fileList.innerHTML = '';
+        
+        if (files.length === 0) {
+            submitBtn.disabled = true;
+            return;
+        }
+
+        if (files.length > 30) {
+            fileList.innerHTML = '<div class="alert alert-error">Maximum 30 files allowed. Please select fewer files.</div>';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        submitBtn.disabled = false;
+
+        const listTitle = document.createElement('h4');
+        listTitle.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected:`;
+        fileList.appendChild(listTitle);
+
+        const ul = document.createElement('ul');
+        ul.className = 'selected-files';
+        
+        files.forEach(file => {
+            const li = document.createElement('li');
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            li.innerHTML = `
+                <span class="file-name">${file.name}</span>
+                <span class="file-size">${fileSize} MB</span>
+            `;
+            ul.appendChild(li);
+        });
+
+        fileList.appendChild(ul);
+    }
+
+    uploadForm.addEventListener('submit', function(e) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+    });
+</script>
+{% endblock %}
+

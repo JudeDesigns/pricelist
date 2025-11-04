@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Processing - PDF Price List Extractor{% endblock %}
+
+{% block content %}
+<div class="process-section">
+    <div class="process-card">
+        <div class="loader"></div>
+        <h2>Processing Your Files</h2>
+        <p>Extracting data from {{ file_count }} PDF file{{ 's' if file_count > 1 else '' }}...</p>
+        <p class="process-info">This may take a few moments depending on the file size and complexity.</p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <button class="btn btn-primary" id="viewResultsBtn" style="display: none;">
+            View Results
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Simulate processing and redirect to results
+    let progress = 0;
+    const progressFill = document.getElementById('progressFill');
+    const viewResultsBtn = document.getElementById('viewResultsBtn');
+    
+    const interval = setInterval(() => {
+        progress += 2;
+        progressFill.style.width = progress + '%';
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+                window.location.href = "{{ url_for('results') }}";
+            }, 500);
+        }
+    }, 100);
+</script>
+{% endblock %}
+

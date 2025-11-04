@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Results - PDF Price List Extractor{% endblock %}
+
+{% block content %}
+<div class="results-section">
+    <div class="results-header">
+        <h2>Extraction Results</h2>
+        <div class="results-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Upload More Files</a>
+            <a href="{{ url_for('clear_session') }}" class="btn btn-outline">Clear Session</a>
+        </div>
+    </div>
+
+    <div class="results-summary">
+        <div class="summary-card">
+            <h3>{{ vendor_results|length }}</h3>
+            <p>Total Vendors</p>
+        </div>
+        <div class="summary-card">
+            <h3>{{ vendor_results|selectattr('status', 'equalto', 'success')|list|length }}</h3>
+            <p>Successful</p>
+        </div>
+        <div class="summary-card">
+            <h3>{{ vendor_results|selectattr('status', 'equalto', 'error')|list|length }}</h3>
+            <p>Failed</p>
+        </div>
+    </div>
+
+    {% for vendor in vendor_results %}
+    <div class="vendor-card {% if vendor.status == 'error' %}vendor-error{% endif %}">
+        <div class="vendor-header">
+            <div>
+                <h3>{{ vendor.vendor_name }}</h3>
+                <p class="vendor-filename">{{ vendor.filename }}</p>
+            </div>
+            <div class="vendor-status">
+                {% if vendor.status == 'success' %}
+                    <span class="badge badge-success">✓ Success</span>
+                    <span class="item-count">{{ vendor.data|length }} items</span>
+                {% else %}
+                    <span class="badge badge-error">✗ Error</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if vendor.status == 'success' and vendor.data|length > 0 %}
+        <div class="export-actions">
+            <a href="{{ url_for('export_data', vendor_index=loop.index0, format='csv') }}" class="btn-export btn-export-csv">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M14 10v3.333A1.667 1.667 0 0112.333 15H3.667A1.667 1.667 0 012 13.333V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4.667 6.667L8 10l3.333-3.333M8 10V1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Export CSV
+            </a>
+            <a href="{{ url_for('export_data', vendor_index=loop.index0, format='json') }}" class="btn-export btn-export-json">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M14 10v3.333A1.667 1.667 0 0112.333 15H3.667A1.667 1.667 0 012 13.333V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4.667 6.667L8 10l3.333-3.333M8 10V1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Export JSON
+            </a>
+        </div>
+        {% endif %}
+
+        {% if vendor.status == 'error' %}
+            <div class="error-message">
+                <strong>Error:</strong> {{ vendor.error }}
+            </div>
+        {% else %}
+            {% if vendor.data|length > 0 %}
+                <div class="search-wrapper">
+                    <div class="search-box">
+                        <input
+                            type="text"
+                            class="search-input"
+                            placeholder="Search by Product ID..."
+                            data-vendor-index="{{ loop.index }}"
+                            oninput="searchTable({{ loop.index }})"
+                        >
+                        <span class="search-results-count" data-vendor-index="{{ loop.index }}"></span>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="data-table" id="table-{{ loop.index }}">
+                        <thead>
+                            <tr>
+                                <th>Product ID</th>
+                                <th>Description</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody class="paginated-tbody" data-vendor-index="{{ loop.index }}">
+                            {% for item in vendor.data %}
+                            <tr class="data-row" data-product-id="{{ item.product_id|lower }}">
+                                <td class="product-id-cell">{{ item.product_id }}</td>
+                                <td>{{ item.description }}</td>
+                                <td class="cost">{{ item.cost }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <div class="pagination-controls" data-vendor-index="{{ loop.index }}" style="display: none;">
+                        <button class="btn-pagination" onclick="changePage({{ loop.index }}, -1)">← Previous</button>
+                        <span class="page-info">
+                            Page <span class="current-page">1</span> of <span class="total-pages"></span>
+                            (Showing <span class="showing-count"></span> of <span class="total-items">{{ vendor.data|length }}</span> items)
+                        </span>
+                        <button class="btn-pagination" onclick="changePage({{ loop.index }}, 1)">Next →</button>
+                    </div>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <p>No data extracted from this file. The PDF may not contain a recognizable price list format.</p>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if vendor_results|length == 0 %}
+    <div class="no-results">
+        <p>No results to display.</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Upload Files</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const ITEMS_PER_PAGE = 20;
+    const vendorPages = {};
+    const vendorSearchState = {};
+
+    // Initialize pagination for all vendors
+    document.addEventListener('DOMContentLoaded', function() {
+        const paginatedTables = document.querySelectorAll('.paginated-tbody');
+
+        paginatedTables.forEach(tbody => {
+            const vendorIndex = tbody.dataset.vendorIndex;
+            const rows = tbody.querySelectorAll('.data-row');
+
+            vendorSearchState[vendorIndex] = {
+                searchTerm: '',
+                filteredRows: Array.from(rows)
+            };
+
+            if (rows.length > ITEMS_PER_PAGE) {
+                vendorPages[vendorIndex] = {
+                    currentPage: 1,
+                    totalPages: Math.ceil(rows.length / ITEMS_PER_PAGE),
+                    totalItems: rows.length
+                };
+
+                updatePagination(vendorIndex);
+            } else {
+                // Show all rows if no pagination needed
+                rows.forEach(row => row.style.display = '');
+            }
+        });
+    });
+
+    function searchTable(vendorIndex) {
+        const searchInput = document.querySelector(`.search-input[data-vendor-index="${vendorIndex}"]`);
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const tbody = document.querySelector(`.paginated-tbody[data-vendor-index="${vendorIndex}"]`);
+        const allRows = tbody.querySelectorAll('.data-row');
+        const resultsCount = document.querySelector(`.search-results-count[data-vendor-index="${vendorIndex}"]`);
+
+        // Update search state
+        vendorSearchState[vendorIndex].searchTerm = searchTerm;
+
+        if (searchTerm === '') {
+            // No search term - show all rows with pagination
+            vendorSearchState[vendorIndex].filteredRows = Array.from(allRows);
+            resultsCount.textContent = '';
+
+            // Re-initialize pagination
+            if (allRows.length > ITEMS_PER_PAGE) {
+                vendorPages[vendorIndex] = {
+                    currentPage: 1,
+                    totalPages: Math.ceil(allRows.length / ITEMS_PER_PAGE),
+                    totalItems: allRows.length
+                };
+                updatePagination(vendorIndex);
+            } else {
+                allRows.forEach(row => row.style.display = '');
+                hidePaginationControls(vendorIndex);
+            }
+        } else {
+            // Filter rows by product ID
+            const filteredRows = Array.from(allRows).filter(row => {
+                const productId = row.dataset.productId;
+                return productId.includes(searchTerm);
+            });
+
+            vendorSearchState[vendorIndex].filteredRows = filteredRows;
+
+            // Update results count
+            if (filteredRows.length === 0) {
+                resultsCount.textContent = 'No results found';
+                resultsCount.style.color = 'var(--error-color)';
+            } else {
+                resultsCount.textContent = `${filteredRows.length} result${filteredRows.length !== 1 ? 's' : ''} found`;
+                resultsCount.style.color = 'var(--success-color)';
+            }
+
+            // Hide all rows first
+            allRows.forEach(row => row.style.display = 'none');
+
+            // Show filtered rows with pagination if needed
+            if (filteredRows.length > ITEMS_PER_PAGE) {
+                vendorPages[vendorIndex] = {
+                    currentPage: 1,
+                    totalPages: Math.ceil(filteredRows.length / ITEMS_PER_PAGE),
+                    totalItems: filteredRows.length
+                };
+                updatePagination(vendorIndex);
+            } else {
+                // Show all filtered rows without pagination
+                filteredRows.forEach(row => row.style.display = '');
+                hidePaginationControls(vendorIndex);
+            }
+        }
+    }
+
+    function changePage(vendorIndex, direction) {
+        const pageData = vendorPages[vendorIndex];
+        if (!pageData) return;
+
+        const newPage = pageData.currentPage + direction;
+
+        if (newPage < 1 || newPage > pageData.totalPages) {
+            return;
+        }
+
+        pageData.currentPage = newPage;
+        updatePagination(vendorIndex);
+    }
+
+    function updatePagination(vendorIndex) {
+        const pageData = vendorPages[vendorIndex];
+        const tbody = document.querySelector(`.paginated-tbody[data-vendor-index="${vendorIndex}"]`);
+        const searchState = vendorSearchState[vendorIndex];
+        const filteredRows = searchState.filteredRows;
+        const controls = document.querySelector(`.pagination-controls[data-vendor-index="${vendorIndex}"]`);
+
+        // Hide all rows first
+        const allRows = tbody.querySelectorAll('.data-row');
+        allRows.forEach(row => row.style.display = 'none');
+
+        // Show only current page rows from filtered results
+        const startIndex = (pageData.currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredRows.length);
+
+        for (let i = startIndex; i < endIndex; i++) {
+            filteredRows[i].style.display = '';
+        }
+
+        // Show and update pagination controls
+        if (controls) {
+            controls.style.display = 'flex';
+            controls.querySelector('.current-page').textContent = pageData.currentPage;
+            controls.querySelector('.total-pages').textContent = pageData.totalPages;
+            controls.querySelector('.showing-count').textContent = `${startIndex + 1}-${endIndex}`;
+            controls.querySelector('.total-items').textContent = filteredRows.length;
+
+            // Enable/disable buttons
+            const prevBtn = controls.querySelector('button:first-child');
+            const nextBtn = controls.querySelector('button:last-child');
+
+            prevBtn.disabled = pageData.currentPage === 1;
+            nextBtn.disabled = pageData.currentPage === pageData.totalPages;
+        }
+    }
+
+    function hidePaginationControls(vendorIndex) {
+        const controls = document.querySelector(`.pagination-controls[data-vendor-index="${vendorIndex}"]`);
+        if (controls) {
+            controls.style.display = 'none';
+        }
+    }
+
+    // Add export functionality if needed
+    function exportToCSV(vendorName) {
+        // Implementation for CSV export
+        console.log('Exporting', vendorName);
+    }
+</script>
+{% endblock %}
+

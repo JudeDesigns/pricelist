@@ -1,0 +1,1335 @@
+{% extends "base.html" %}
+
+{% block title %}Results - PDF Price List Extractor{% endblock %}
+
+{% block content %}
+<div class="results-section">
+    <div class="results-header">
+        <h2>Extraction Results</h2>
+        <div class="results-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Upload More Files</a>
+            <a href="{{ url_for('clear_session') }}" class="btn btn-outline">Clear Session</a>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle">
+        <button id="vendorViewBtn" class="toggle-btn active" onclick="switchView('vendor')">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h12v2H2v-2z"/>
+            </svg>
+            By Vendor
+        </button>
+        <button id="allProductsViewBtn" class="toggle-btn" onclick="switchView('all')">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 0h7v7H0V0zm9 0h7v7H9V0zM0 9h7v7H0V9zm9 0h7v7H9V9z"/>
+            </svg>
+            All Products
+        </button>
+    </div>
+
+    <!-- Processing Status -->
+    <div id="processingStatus" class="processing-status">
+        <div class="spinner"></div>
+        <p>Processing <span id="processedCount">0</span> of <span id="totalCount">{{ total_files }}</span> files...</p>
+    </div>
+
+    <!-- Results Summary -->
+    <div id="resultsSummary" class="results-summary" style="display: none;">
+        <div class="summary-card">
+            <h3 id="totalVendors">0</h3>
+            <p>Total Vendors</p>
+        </div>
+        <div class="summary-card">
+            <h3 id="successCount">0</h3>
+            <p>Successful</p>
+        </div>
+        <div class="summary-card">
+            <h3 id="errorCount">0</h3>
+            <p>Failed</p>
+        </div>
+        <div class="summary-card">
+            <h3 id="totalProducts">0</h3>
+            <p>Total Products</p>
+        </div>
+    </div>
+
+    <!-- By Vendor View -->
+    <div id="vendorView" class="view-container">
+        <div id="vendorResults"></div>
+    </div>
+
+    <!-- All Products View -->
+    <div id="allProductsView" class="view-container" style="display: none;">
+        <div class="all-products-header">
+            <h3>All Products (<span id="allProductsCount">0</span>)</h3>
+            <div class="search-export-container">
+                <div class="search-container">
+                    <input type="text" id="allProductsSearch" placeholder="Search by Product ID or Description..." class="search-input">
+                    <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <button onclick="exportAllProducts('csv')" class="btn-export btn-export-csv">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 12L3 7h3V1h4v6h3l-5 5z" fill="currentColor"/>
+                        <path d="M1 14h14v2H1v-2z" fill="currentColor"/>
+                    </svg>
+                    Download CSV
+                </button>
+                <button onclick="showAIMatchingModal()" class="btn-export btn-export-ai">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z" fill="currentColor"/>
+                        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    AI Product Matching
+                </button>
+                <button onclick="showUpdateSpreadsheetModal()" class="btn-export btn-export-update">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M13 1H3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V3a2 2 0 00-2-2z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <path d="M1 5h14M5 1v14" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 8l-2 2-2-2M8 10V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    Update Existing Spreadsheet
+                </button>
+                <button onclick="exportAllProducts('json')" class="btn-export btn-export-json">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 1h10a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V3a2 2 0 012-2z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <path d="M5 6h6M5 9h6M5 12h4" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Export JSON
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Vendor</th>
+                        <th>Product ID</th>
+                        <th>Product Description</th>
+                        <th>Cost</th>
+                    </tr>
+                </thead>
+                <tbody id="allProductsTable">
+                    <!-- Products will be loaded here dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="allProductsPagination" class="pagination"></div>
+    </div>
+</div>
+
+<!-- Update Spreadsheet Modal -->
+<div id="updateSpreadsheetModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Update Existing Spreadsheet</h3>
+            <button class="modal-close" onclick="closeUpdateSpreadsheetModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-description">
+                Upload your existing Excel spreadsheet (.xlsx) to update product prices.
+                The application will match products by Product ID and update the costs while preserving all other data.
+            </p>
+
+            <form id="updateSpreadsheetForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="spreadsheetFile">Select Spreadsheet File:</label>
+                    <input type="file" id="spreadsheetFile" name="spreadsheet" accept=".xlsx" required>
+                    <small>Accepted format: Excel (.xlsx)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="priceType">Price Type to Use:</label>
+                    <select id="priceType" name="price_type">
+                        <option value="cost">Standard Cost (default)</option>
+                        <option value="case_price">Case Price (if available)</option>
+                        <option value="pallet_price">Pallet Price (if available)</option>
+                    </select>
+                    <small>Choose which price to use when updating "Current Cost" column</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="productIdColumn">Product ID Column Name (in your spreadsheet):</label>
+                    <input type="text" id="productIdColumn" name="product_id_column" value="Product Code" placeholder="e.g., Product Code, Product ID, SKU">
+                    <small>The column name in your spreadsheet that contains product IDs</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeUpdateSpreadsheetModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Spreadsheet</button>
+                </div>
+            </form>
+
+            <div id="updateProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="updateProgressFill"></div>
+                </div>
+                <p id="updateProgressText">Processing...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Product Matching Modal -->
+<div id="aiMatchingModal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>🤖 AI Product Matching</h3>
+            <button class="modal-close" onclick="closeAIMatchingModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-description">
+                Match extracted products against your reference database (Book1.xlsx with 2,103 products) using <strong>Smart ID Matching</strong> with AI fallback.
+                The system uses fast ID-only matching for products with valid IDs, and automatically falls back to AI-powered contextual matching when Product IDs are missing or invalid.
+            </p>
+
+            <div class="info-box">
+                <strong>📚 Reference Database:</strong> Book1.xlsx (2,103 products)<br>
+                <strong>📊 Extracted Products:</strong> <span id="extractedCount">Loading...</span><br>
+                <strong>⏱️ Estimated Time:</strong> <span id="estimatedTime">~1 second (instant ID matching)</span><br>
+                <strong>🔍 Matching Strategy:</strong><br>
+                &nbsp;&nbsp;• <strong>Primary:</strong> Fast ID-only matching (instant)<br>
+                &nbsp;&nbsp;• <strong>AI Verification:</strong> Used for ambiguous short IDs (1-2 digits)<br>
+                &nbsp;&nbsp;• <strong>AI Fallback:</strong> Used when Product ID is missing/invalid<br>
+                <strong>🔧 ID Normalization Rules:</strong><br>
+                &nbsp;&nbsp;• Strips leading patterns: "G015050194", "Kruse06", "ZTBD6" → "15050194", "6", "6"<br>
+                &nbsp;&nbsp;• Strips trailing letters: "156171A", "156171B" → "156171"<br>
+                &nbsp;&nbsp;• Keeps 2-digit suffixes: "156171-01", "156171-99" → "156171-01", "156171-99"<br>
+                <strong>🤖 AI Smart Matching:</strong><br>
+                &nbsp;&nbsp;• <strong>Short ID Disambiguation:</strong> When "06" matches both "ZTBD6" (BEEF) and "Kruse06" (HAM), AI verifies using description<br>
+                &nbsp;&nbsp;• <strong>Missing ID Fallback:</strong> When Product ID = "N/A", uses AI with description for contextual matching
+            </div>
+
+            <form id="aiMatchingForm">
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAIMatchingModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Start Product Matching</button>
+                </div>
+            </form>
+
+            <div id="aiMatchingProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="aiMatchingProgressFill"></div>
+                </div>
+                <p id="aiMatchingProgressText">Processing...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="aiMatchingResults" style="display: none;">
+                <div class="results-header">
+                    <h4>Matching Results</h4>
+                    <div>
+                        <button onclick="downloadMatchingResults()" class="btn btn-primary btn-sm">Download Results (CSV)</button>
+                        <button onclick="clearMatchingResults()" class="btn btn-secondary btn-sm" style="margin-left: 8px;">Clear Results</button>
+                    </div>
+                </div>
+
+                <div class="results-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalProducts">0</div>
+                        <div class="summary-label">Total Products</div>
+                    </div>
+                    <div class="summary-card success">
+                        <div class="summary-value" id="matchedProducts">0</div>
+                        <div class="summary-label">Matched</div>
+                    </div>
+                    <div class="summary-card warning">
+                        <div class="summary-value" id="unmatchedProducts">0</div>
+                        <div class="summary-label">No Match</div>
+                    </div>
+                    <div class="summary-card info">
+                        <div class="summary-value" id="avgConfidence">0%</div>
+                        <div class="summary-label">Avg Confidence</div>
+                    </div>
+                </div>
+
+                <div class="results-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Extracted ID</th>
+                                <th>Extracted Description</th>
+                                <th>Matched ID</th>
+                                <th>Matched Description</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matchingResultsBody">
+                            <!-- Results will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let vendorResults = {{ initial_results | tojson | safe }};
+let allProducts = [];
+let currentView = 'vendor';
+let allProductsCurrentPage = 1;
+const allProductsPerPage = 50;
+
+// Initialize with existing results if any
+if (vendorResults.length > 0) {
+    console.log(`📂 Loaded ${vendorResults.length} existing results`);
+    updateResults({
+        results: vendorResults,
+        status: 'processing', // Will be updated by polling
+        total_files: {{ total_files }}
+    });
+}
+
+// Start polling for results
+const sessionId = '{{ session_id }}';
+pollResults();
+
+function pollResults() {
+    fetch(`/api/results/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            updateResults(data);
+            
+            if (data.status === 'processing') {
+                // Continue polling every 2 seconds
+                setTimeout(pollResults, 2000);
+            } else {
+                // Processing complete
+                document.getElementById('processingStatus').style.display = 'none';
+                document.getElementById('resultsSummary').style.display = 'flex';
+            }
+        })
+        .catch(error => {
+            console.error('Error polling results:', error);
+            setTimeout(pollResults, 2000);
+        });
+}
+
+function updateResults(data) {
+    vendorResults = data.results || [];
+    
+    // Update counts
+    document.getElementById('processedCount').textContent = vendorResults.length;
+    document.getElementById('totalCount').textContent = data.total_files || 0;
+    document.getElementById('totalVendors').textContent = vendorResults.length;
+    document.getElementById('successCount').textContent = vendorResults.filter(v => v.status === 'success').length;
+    document.getElementById('errorCount').textContent = vendorResults.filter(v => v.status === 'error').length;
+    
+    // Build all products array
+    allProducts = [];
+    vendorResults.forEach(vendor => {
+        if (vendor.status === 'success' && vendor.data) {
+            vendor.data.forEach(product => {
+                allProducts.push({
+                    vendor_name: vendor.vendor_name,
+                    vendor_code: vendor.vendor_code,
+                    filename: vendor.filename,
+                    product_id: product.product_id,
+                    product_description: product.description || product.product_description,
+                    cost: product.cost
+                });
+            });
+        }
+    });
+    
+    document.getElementById('totalProducts').textContent = allProducts.length;
+    document.getElementById('allProductsCount').textContent = allProducts.length;
+    
+    // Update vendor view
+    updateVendorView();
+    
+    // Update all products view
+    updateAllProductsView();
+}
+
+function updateVendorView() {
+    const container = document.getElementById('vendorResults');
+    container.innerHTML = '';
+    
+    vendorResults.forEach((vendor, index) => {
+        const vendorCard = createVendorCard(vendor, index);
+        container.appendChild(vendorCard);
+    });
+}
+
+function createVendorCard(vendor, index) {
+    const card = document.createElement('div');
+    card.className = `vendor-card ${vendor.status === 'error' ? 'vendor-error' : ''}`;
+    card.id = `vendor-${index}`;
+    
+    const statusBadge = vendor.status === 'success' 
+        ? `<span class="badge badge-success">✓ Success</span><span class="item-count">${vendor.data?.length || 0} items</span>`
+        : `<span class="badge badge-error">✗ Error</span>`;
+    
+    let exportButtons = '';
+    if (vendor.status === 'success' && vendor.data && vendor.data.length > 0) {
+        exportButtons = `
+            <div class="export-actions">
+                <a href="/export/${index}/csv" class="btn-export btn-export-csv">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 12L3 7h3V1h4v6h3l-5 5z" fill="currentColor"/>
+                        <path d="M1 14h14v2H1v-2z" fill="currentColor"/>
+                    </svg>
+                    Export CSV
+                </a>
+                <a href="/export/${index}/json" class="btn-export btn-export-json">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 1h10a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V3a2 2 0 012-2z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <path d="M5 6h6M5 9h6M5 12h4" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    Export JSON
+                </a>
+            </div>
+        `;
+    }
+    
+    let tableHtml = '';
+    if (vendor.status === 'success' && vendor.data && vendor.data.length > 0) {
+        const itemsPerPage = 25; // Fixed: 25 rows per page
+        const totalPages = Math.ceil(vendor.data.length / itemsPerPage);
+        const currentPage = 1;
+        const startIdx = 0;
+        const endIdx = Math.min(itemsPerPage, vendor.data.length);
+        const pageData = vendor.data.slice(startIdx, endIdx);
+
+        // Generate table rows - always 25 rows (fill with empty rows if needed)
+        let tableRows = '';
+        for (let i = 0; i < itemsPerPage; i++) {
+            if (i < pageData.length) {
+                // Real data row
+                const item = pageData[i];
+                tableRows += `
+                    <tr class="vendor-row-${index}">
+                        <td>${item.product_id || 'N/A'}</td>
+                        <td>${item.description || item.product_description || ''}</td>
+                        <td>${item.cost || 'N/A'}</td>
+                    </tr>
+                `;
+            } else {
+                // Empty placeholder row
+                tableRows += `
+                    <tr class="vendor-row-${index} empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                    </tr>
+                `;
+            }
+        }
+
+        tableHtml = `
+            <div class="vendor-search">
+                <input type="text" placeholder="Search by Product ID or Description..." class="search-input" onkeyup="searchVendorTable(${index}, this.value)">
+            </div>
+            <div class="table-container">
+                <table class="data-table fixed-table">
+                    <thead>
+                        <tr>
+                            <th>Product ID</th>
+                            <th>Product Description</th>
+                            <th>Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vendor-table-${index}">
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+            <div id="vendor-pagination-${index}" class="pagination">
+                <div class="pagination-controls">
+                    <button onclick="changeVendorPage(${index}, ${currentPage - 1})" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                    <span class="pagination-info">Page ${currentPage} of ${totalPages}</span>
+                    <button onclick="changeVendorPage(${index}, ${currentPage + 1})" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                </div>
+            </div>
+        `;
+    } else if (vendor.status === 'error') {
+        tableHtml = `<div class="error-message"><p><strong>Error:</strong> ${vendor.error || 'Unknown error'}</p></div>`;
+    }
+    
+    card.innerHTML = `
+        <div class="vendor-header">
+            <div>
+                <h3>${vendor.vendor_name}</h3>
+                <p class="vendor-filename">${vendor.filename}</p>
+            </div>
+            <div class="vendor-status">
+                ${statusBadge}
+            </div>
+        </div>
+        ${exportButtons}
+        ${tableHtml}
+    `;
+    
+    return card;
+}
+
+function switchView(view) {
+    currentView = view;
+    
+    if (view === 'vendor') {
+        document.getElementById('vendorView').style.display = 'block';
+        document.getElementById('allProductsView').style.display = 'none';
+        document.getElementById('vendorViewBtn').classList.add('active');
+        document.getElementById('allProductsViewBtn').classList.remove('active');
+    } else {
+        document.getElementById('vendorView').style.display = 'none';
+        document.getElementById('allProductsView').style.display = 'block';
+        document.getElementById('vendorViewBtn').classList.remove('active');
+        document.getElementById('allProductsViewBtn').classList.add('active');
+        updateAllProductsView();
+    }
+}
+
+function updateAllProductsView() {
+    const searchTerm = document.getElementById('allProductsSearch').value.toLowerCase();
+    const filteredProducts = allProducts.filter(product => {
+        const productId = (product.product_id || '').toLowerCase();
+        const description = (product.product_description || '').toLowerCase();
+        return productId.includes(searchTerm) || description.includes(searchTerm);
+    });
+    
+    const totalPages = Math.ceil(filteredProducts.length / allProductsPerPage);
+    const startIndex = (allProductsCurrentPage - 1) * allProductsPerPage;
+    const endIndex = startIndex + allProductsPerPage;
+    const pageProducts = filteredProducts.slice(startIndex, endIndex);
+    
+    const tbody = document.getElementById('allProductsTable');
+    tbody.innerHTML = pageProducts.map(product => `
+        <tr>
+            <td><span class="vendor-badge">${product.vendor_name}</span></td>
+            <td>${product.product_id || 'N/A'}</td>
+            <td>${product.product_description || ''}</td>
+            <td>${product.cost || 'N/A'}</td>
+        </tr>
+    `).join('');
+    
+    // Update pagination
+    updateAllProductsPagination(totalPages);
+}
+
+function updateAllProductsPagination(totalPages) {
+    const pagination = document.getElementById('allProductsPagination');
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="pagination-controls">';
+    
+    if (allProductsCurrentPage > 1) {
+        html += `<button onclick="changeAllProductsPage(${allProductsCurrentPage - 1})" class="pagination-btn">Previous</button>`;
+    }
+    
+    html += `<span class="pagination-info">Page ${allProductsCurrentPage} of ${totalPages}</span>`;
+    
+    if (allProductsCurrentPage < totalPages) {
+        html += `<button onclick="changeAllProductsPage(${allProductsCurrentPage + 1})" class="pagination-btn">Next</button>`;
+    }
+    
+    html += '</div>';
+    pagination.innerHTML = html;
+}
+
+function changeAllProductsPage(page) {
+    allProductsCurrentPage = page;
+    updateAllProductsView();
+}
+
+// Search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('allProductsSearch');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function() {
+            allProductsCurrentPage = 1;
+            updateAllProductsView();
+        });
+    }
+});
+
+function searchVendorTable(vendorIndex, searchTerm) {
+    const rows = document.querySelectorAll(`.vendor-row-${vendorIndex}`);
+    searchTerm = searchTerm.toLowerCase();
+
+    rows.forEach(row => {
+        const productId = row.cells[0].textContent.toLowerCase();
+        const description = row.cells[1].textContent.toLowerCase();
+
+        if (productId.includes(searchTerm) || description.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Vendor pagination state
+const vendorPageState = {};
+
+function changeVendorPage(vendorIndex, page) {
+    const vendor = vendorResults[vendorIndex];
+    if (!vendor || !vendor.data) return;
+
+    const itemsPerPage = 25; // Fixed: 25 rows per page
+    const totalPages = Math.ceil(vendor.data.length / itemsPerPage);
+
+    // Validate page number
+    if (page < 1 || page > totalPages) return;
+
+    // Update state
+    vendorPageState[vendorIndex] = page;
+
+    // Calculate slice indices
+    const startIdx = (page - 1) * itemsPerPage;
+    const endIdx = Math.min(startIdx + itemsPerPage, vendor.data.length);
+    const pageData = vendor.data.slice(startIdx, endIdx);
+
+    // Generate table rows - always 25 rows (fill with empty rows if needed)
+    let tableRows = '';
+    for (let i = 0; i < itemsPerPage; i++) {
+        if (i < pageData.length) {
+            // Real data row
+            const item = pageData[i];
+            tableRows += `
+                <tr class="vendor-row-${vendorIndex}">
+                    <td>${item.product_id || 'N/A'}</td>
+                    <td>${item.description || item.product_description || ''}</td>
+                    <td>${item.cost || 'N/A'}</td>
+                </tr>
+            `;
+        } else {
+            // Empty placeholder row
+            tableRows += `
+                <tr class="vendor-row-${vendorIndex} empty-row">
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+            `;
+        }
+    }
+
+    // Update table body
+    const tbody = document.getElementById(`vendor-table-${vendorIndex}`);
+    tbody.innerHTML = tableRows;
+
+    // Update pagination controls - ALWAYS show them
+    const paginationDiv = document.getElementById(`vendor-pagination-${vendorIndex}`);
+    paginationDiv.innerHTML = `
+        <div class="pagination-controls">
+            <button onclick="changeVendorPage(${vendorIndex}, ${page - 1})" class="pagination-btn" ${page === 1 ? 'disabled' : ''}>Previous</button>
+            <span class="pagination-info">Page ${page} of ${totalPages}</span>
+            <button onclick="changeVendorPage(${vendorIndex}, ${page + 1})" class="pagination-btn" ${page === totalPages ? 'disabled' : ''}>Next</button>
+        </div>
+    `;
+}
+
+function exportAllProducts(format) {
+    window.location.href = `/export/all/${format}`;
+}
+
+// Modal functions for Update Spreadsheet
+function showUpdateSpreadsheetModal() {
+    document.getElementById('updateSpreadsheetModal').style.display = 'flex';
+}
+
+function closeUpdateSpreadsheetModal() {
+    document.getElementById('updateSpreadsheetModal').style.display = 'none';
+    document.getElementById('updateSpreadsheetForm').reset();
+    document.getElementById('updateProgress').style.display = 'none';
+}
+
+// Handle form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('updateSpreadsheetForm');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const progressDiv = document.getElementById('updateProgress');
+            const progressFill = document.getElementById('updateProgressFill');
+            const progressText = document.getElementById('updateProgressText');
+
+            // Show progress
+            form.style.display = 'none';
+            progressDiv.style.display = 'block';
+            progressText.textContent = 'Uploading and processing spreadsheet...';
+            progressFill.style.width = '50%';
+
+            try {
+                const response = await fetch('/update-spreadsheet', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Get the filename from Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'updated_spreadsheet.xlsx';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    // Download the file
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    progressFill.style.width = '100%';
+                    progressText.textContent = 'Success! Download started.';
+
+                    // Close modal after 2 seconds
+                    setTimeout(() => {
+                        closeUpdateSpreadsheetModal();
+                        form.style.display = 'block';
+                    }, 2000);
+                } else {
+                    const errorText = await response.text();
+                    progressText.textContent = `Error: ${errorText}`;
+                    progressText.style.color = '#e74c3c';
+
+                    // Show form again after 3 seconds
+                    setTimeout(() => {
+                        form.style.display = 'block';
+                        progressDiv.style.display = 'none';
+                        progressText.style.color = '';
+                    }, 3000);
+                }
+            } catch (error) {
+                progressText.textContent = `Error: ${error.message}`;
+                progressText.style.color = '#e74c3c';
+
+                // Show form again after 3 seconds
+                setTimeout(() => {
+                    form.style.display = 'block';
+                    progressDiv.style.display = 'none';
+                    progressText.style.color = '';
+                }, 3000);
+            }
+        });
+    }
+});
+
+// AI Matching Modal Functions
+function showAIMatchingModal() {
+    const modal = document.getElementById('aiMatchingModal');
+    modal.style.display = 'flex';
+
+    // Update extracted product count
+    const productCount = allProducts.length;
+    document.getElementById('extractedCount').textContent = productCount + ' products';
+
+    // Update estimated time (ID matching is instant)
+    document.getElementById('estimatedTime').textContent =
+        `~1 second (instant ID matching for ${productCount} products)`;
+}
+
+function closeAIMatchingModal() {
+    document.getElementById('aiMatchingModal').style.display = 'none';
+    // Don't reset form or hide results - keep them for when user reopens
+}
+
+function clearMatchingResults() {
+    // Clear the results and reset the form
+    matchingResultsData = [];
+    document.getElementById('aiMatchingResults').style.display = 'none';
+    document.getElementById('aiMatchingProgress').style.display = 'none';
+    document.getElementById('aiMatchingForm').reset();
+
+    // Clear the table
+    const tbody = document.querySelector('#matchingResultsTable tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+
+    alert('Results cleared! You can run a new matching.');
+}
+
+let matchingResultsData = [];
+
+// Handle AI Matching form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const aiForm = document.getElementById('aiMatchingForm');
+    if (aiForm) {
+        aiForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(aiForm);
+            const progressDiv = document.getElementById('aiMatchingProgress');
+            const progressFill = document.getElementById('aiMatchingProgressFill');
+            const progressText = document.getElementById('aiMatchingProgressText');
+            const resultsDiv = document.getElementById('aiMatchingResults');
+
+            // Show progress
+            aiForm.style.display = 'none';
+            progressDiv.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            progressText.textContent = 'Matching products by ID...';
+            progressFill.style.width = '30%';
+
+            try {
+                const response = await fetch('/ai-match', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                progressFill.style.width = '70%';
+                progressText.textContent = 'Processing results...';
+
+                if (response.ok) {
+                    const data = await response.json();
+                    matchingResultsData = data.results;
+
+                    progressFill.style.width = '100%';
+                    progressText.textContent = 'Complete!';
+
+                    // Display results
+                    displayMatchingResults(data);
+
+                    // Hide progress, show results
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                        resultsDiv.style.display = 'block';
+                    }, 500);
+
+                } else {
+                    const errorText = await response.text();
+                    progressText.textContent = `Error: ${errorText}`;
+                    progressText.style.color = '#e74c3c';
+
+                    setTimeout(() => {
+                        aiForm.style.display = 'block';
+                        progressDiv.style.display = 'none';
+                        progressText.style.color = '';
+                    }, 3000);
+                }
+            } catch (error) {
+                progressText.textContent = `Error: ${error.message}`;
+                progressText.style.color = '#e74c3c';
+
+                setTimeout(() => {
+                    aiForm.style.display = 'block';
+                    progressDiv.style.display = 'none';
+                    progressText.style.color = '';
+                }, 3000);
+            }
+        });
+    }
+});
+
+function displayMatchingResults(data) {
+    // Update summary cards
+    document.getElementById('totalProducts').textContent = data.summary.total;
+    document.getElementById('matchedProducts').textContent = data.summary.matched;
+    document.getElementById('unmatchedProducts').textContent = data.summary.unmatched;
+    document.getElementById('avgConfidence').textContent = data.summary.avg_confidence;
+
+    // Populate results table
+    const tbody = document.getElementById('matchingResultsBody');
+    tbody.innerHTML = '';
+
+    data.results.forEach(result => {
+        const row = document.createElement('tr');
+
+        const statusClass = result.matched_id === 'NO_MATCH' ? 'status-no-match' : 'status-match';
+        const statusText = result.matched_id === 'NO_MATCH' ? '⚠️ No Match' : '✅ Match';
+        const confidence = result.confidence ? `${(result.confidence * 100).toFixed(0)}%` : 'N/A';
+
+        row.innerHTML = `
+            <td>${result.extracted_id}</td>
+            <td class="description-cell">${result.extracted_description}</td>
+            <td>${result.matched_id}</td>
+            <td class="description-cell">${result.matched_description || '-'}</td>
+            <td><span class="confidence-badge">${confidence}</span></td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+function downloadMatchingResults() {
+    // Convert results to CSV
+    const headers = ['Extracted ID', 'Extracted Description', 'Matched ID', 'Matched Description', 'Confidence', 'Reasoning'];
+    const rows = matchingResultsData.map(r => [
+        r.extracted_id,
+        r.extracted_description,
+        r.matched_id,
+        r.matched_description || '',
+        r.confidence ? (r.confidence * 100).toFixed(1) + '%' : 'N/A',
+        r.reasoning || ''
+    ]);
+
+    let csv = headers.join(',') + '\n';
+    rows.forEach(row => {
+        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai_matching_results_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
+</script>
+
+<style>
+.view-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 4px;
+    background: #f6f6f6;
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    background: #fff;
+    color: #000;
+}
+
+.toggle-btn.active {
+    background: #000;
+    color: #fff;
+}
+
+.processing-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    background: #f6f6f6;
+    border-radius: 8px;
+    margin-bottom: 24px;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #000;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.all-products-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.search-export-container {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.vendor-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #666;
+}
+
+/* Update Spreadsheet Button */
+.btn-export-update {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-export-update:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #63408a 100%);
+    transform: translateY(-2px);
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-description {
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.6;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.form-group input[type="file"],
+.form-group input[type="text"],
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-group input[type="file"]:focus,
+.form-group input[type="text"]:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 6px;
+    color: #999;
+    font-size: 12px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+#updateProgress {
+    text-align: center;
+    padding: 20px 0;
+}
+
+#updateProgressText {
+    color: #666;
+    font-size: 14px;
+}
+
+/* AI Matching Button */
+.btn-export-ai {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.btn-export-ai:hover {
+    background: linear-gradient(135deg, #e082ea 0%, #e4465b 100%);
+    transform: translateY(-2px);
+}
+
+/* Modal Large */
+.modal-large {
+    max-width: 1000px;
+    width: 95%;
+}
+
+/* Results Section */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 24px 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.results-header h4 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+.results-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.summary-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    border: 2px solid #e0e0e0;
+}
+
+.summary-card.success {
+    background: #d4edda;
+    border-color: #28a745;
+}
+
+.summary-card.warning {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.summary-card.info {
+    background: #d1ecf1;
+    border-color: #17a2b8;
+}
+
+.summary-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.summary-label {
+    font-size: 13px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.results-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.results-table thead {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    z-index: 10;
+}
+
+.results-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.results-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.results-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.description-cell {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.confidence-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #17a2b8;
+    color: white;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.status-match {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.status-no-match {
+    color: #ffc107;
+    font-weight: 600;
+}
+
+#aiMatchingProgress {
+    text-align: center;
+    padding: 20px 0;
+}
+
+#aiMatchingProgressText {
+    color: #666;
+    font-size: 14px;
+}
+
+.info-box {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 16px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.info-box strong {
+    color: #1976d2;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.results-header > div {
+    display: flex;
+    gap: 8px;
+}
+</style>
+{% endblock %}
+
